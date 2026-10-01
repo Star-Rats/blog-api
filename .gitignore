@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# 环境配置（prod 含敏感信息，不进仓库）
+.env.prod
+
+# 日志/临时文件
+*.log
+.DS_Store

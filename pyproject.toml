@@ -1,0 +1,24 @@
+[project]
+name = "blog"
+version = "1.0.0"
+description = "自托管博客后端（FastAPI + SQLAlchemy + MySQL），文章在管理后台创作发布"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.142",
+    "uvicorn[standard]>=0.54",
+    "sqlalchemy>=2.1",
+    "pymysql>=1.2",
+    "cryptography>=50.0",
+    "pydantic>=2.13",
+    "pydantic-settings>=2.15",
+    "httpx>=0.28",
+    "pyjwt>=2.15",
+    "oss2>=2.19.1",
+    "python-multipart>=0.0.32",
+    "markdown-it-py>=4.2.0",
+]
+
+[tool.uv]
+# 应用项目：只管理依赖，不把项目本身构建成包
+package = false
