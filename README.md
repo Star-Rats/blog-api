@@ -57,12 +57,21 @@ APP_ENV=prod uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 VITE_API_BASE=https://api.example.com npm run build
 ```
 
+生产部署（Docker 一键）：nginx 网关（托管前端 + 反代 API）+ api + mysql 三容器编排，配置与数据全部挂载宿主机：
+
+```bash
+./deploy/deploy.sh install     # 首次部署（详见 deploy/README.md）
+./deploy/deploy.sh update      # 日常更新
+./deploy/deploy.sh backup      # 备份数据库
+```
+
 生产部署注意：
 
-- 必须修改 `ADMIN_PASSWORD`、`JWT_SECRET`（长随机串）、数据库账号密码。
-- 前端产物在各自 `dist/`，由 Nginx 托管，SPA 路由 fallback 到 `index.html`。
+- 必须修改 `ADMIN_PASSWORD`、`JWT_SECRET`（install 时自动随机生成，可在 .env 再改）、数据库密码。
+- 前端产物在各自 `dist/`，由 nginx 容器托管，路径在 `.env` 的 `WEB_INDEX_DIST` / `WEB_ADMIN_DIST` 配置。
 - 编辑器图片上传到阿里云 OSS：在后台「站点设置 → 图片存储」配置 Endpoint/Bucket/AccessKey 后生效（配置存数据库，改完即时生效）。建议为 AccessKey 仅授予该 Bucket 的读写权限；如绑定 CDN 可填自定义域名。
 - 主站 `index.html` 已带 `<meta name="referrer" content="no-referrer">`，外链图片不受 Referer 防盗链影响。
+- 构建期需要代理拉取依赖时：`export DOCKER_BUILD_PROXY=http://宿主机代理:端口`（详见 deploy/README.md）。
 
 ## API 一览
 

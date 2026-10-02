@@ -10,3 +10,8 @@ __pycache__/
 # 日志/临时文件
 *.log
 .DS_Store
+
+# Docker 部署运行时（compose 配置与数据不进仓库）
+.env
+data/
+backups/
