@@ -3,7 +3,7 @@
 - 仅迁移未删除的文章；status 映射：1公开→已发布，2私密/3草稿→草稿
 - 发布时间（create_time）原样保留到 gmt_create / published_at；update_time → gmt_modify
 - 正文 markdown → HTML（markdown-it，启用表格/删除线），图片 URL 不改动
-- 分类、标签一并迁移并保留关联
+- 标签一并迁移并保留关联；分类按名称映射到新库已有分类（未匹配的文章归未分类，后台可手动调整）
 - slug 规则：article-{旧文档ID}（稳定，可回溯）
 - 幂等：slug 已存在则跳过
 
@@ -73,18 +73,16 @@ def main() -> None:
     published = 0
     skipped = 0
 
-    # 1) 分类：旧 id -> 新 Category
+    # 1) 分类：旧分类按名称映射到新库已有分类（新博客的分类体系由博主自定，不自动创建）
+    existing_cats = {c.name: c for c in db.scalars(select(Category)).all()}
     old_cat_to_new: dict[int, Category] = {}
+    unmapped: set[str] = set()
     for cat in categories:
         name = str(cat["category_name"]).strip()
-        exists = db.scalar(select(Category).where(Category.name == name))
-        if exists:
-            old_cat_to_new[cat["id"]] = exists
-            continue
-        new_cat = Category(name=name, slug=auto_slug(name))
-        db.add(new_cat)
-        db.flush()
-        old_cat_to_new[cat["id"]] = new_cat
+        if name in existing_cats:
+            old_cat_to_new[cat["id"]] = existing_cats[name]
+        else:
+            unmapped.add(name)
 
     # 2) 标签：旧 id -> 新 Tag
     old_tag_to_new: dict[int, Tag] = {}
@@ -137,7 +135,9 @@ def main() -> None:
 
     deleted = sum(1 for a in articles if int(a["is_delete"] or 0))
     print(f"迁移完成：旧库文章 {len(articles)} 篇（已删除跳过 {deleted}），导入 {published}，跳过(已存在) {skipped}")
-    print(f"分类 {len(old_cat_to_new)}，标签 {len(old_tag_to_new)}")
+    print(f"映射分类 {len(old_cat_to_new)} 个，标签 {len(old_tag_to_new)} 个")
+    if unmapped:
+        print("以下旧分类在新库不存在，对应文章为未分类（可后台手动调整）:", "、".join(sorted(unmapped)))
 
 
 if __name__ == "__main__":
