@@ -4,6 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.core.api_response import ApiResponse
 from app.db.base import get_db
 from app.repositories import articles as article_repo
 from app.repositories import categories as category_repo
@@ -15,19 +16,20 @@ from app.services.settings import get_site_settings
 router = APIRouter(prefix="/api", tags=["home"])
 
 
-@router.get("/about", response_model=AboutOut)
+@router.get("/about", response_model=ApiResponse[AboutOut])
 def get_about(db: Session = Depends(get_db)):
     """「关于我」页内容（Markdown，后台站点设置中维护）。"""
-    return AboutOut(content=get_site_settings(db).get("about_content", ""))
+    content = get_site_settings(db).get("about_content", "")
+    return ApiResponse.ok(AboutOut(content=content))
 
 
-@router.get("/home", response_model=HomeOut)
+@router.get("/home", response_model=ApiResponse[HomeOut])
 def get_home(db: Session = Depends(get_db)):
     counts = category_repo.published_counts(db)
     visible_categories = category_repo.list_visible(db)
     tag_rows = tag_repo.list_with_published_count(db, limit=20)
     recent = article_repo.recent_published(db, 6)
-    return HomeOut(
+    return ApiResponse.ok(HomeOut(
         site=get_site_settings(db),
         stats=HomeStats(
             article_count=article_repo.count_published(db),
@@ -37,4 +39,4 @@ def get_home(db: Session = Depends(get_db)):
         recent_articles=[article_summary(a) for a in recent],
         categories=[category_out(c, counts.get(c.id, 0)) for c in visible_categories],
         tags=[TagOut(id=t.id, name=t.name) for t, _count in tag_rows],
-    )
+    ))

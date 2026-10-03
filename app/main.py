@@ -130,6 +130,6 @@ async def unexpected_error_handler(_request: Request, exc: Exception):
     return fail_json(ApiCode.SYSTEM_ERROR, "系统异常，请稍后重试")
 
 
-@app.get("/api/health", tags=["system"])
+@app.get("/api/health", response_model=ApiResponse[dict], tags=["system"])
 def health():
-    return {"status": "ok", "env": get_settings().app_env}
+    return ApiResponse.ok({"status": "ok", "env": get_settings().app_env})

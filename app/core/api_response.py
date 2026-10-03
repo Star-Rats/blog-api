@@ -2,11 +2,19 @@
 
 所有 /api 响应统一为 {"code", "message", "data"}，HTTP 状态恒为 200，
 业务语义由 code 区分（沿用原 Spring 项目的错误码段位）。
+
+路由层显式返回 `ApiResponse.ok(data)`，并用泛型标注响应模型：
+    @router.get("/x", response_model=ApiResponse[SomeOut])
+    def endpoint(...):
+        return ApiResponse.ok(SomeOut(...))
+
+main.py 的 ApiEnvelopeMiddleware 作为兜底：漏包的响应自动包装，
+异常 advice（BizError/AuthError 等）产出的响应已带封装、不会二次包装。
 """
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -24,29 +32,31 @@ class ApiCode(IntEnum):
 
 SUCCESS_MESSAGE = "操作成功"
 
-# 统一封装的特征键：中间件据此识别"已是 ApiResponse"的响应（异常 advice 产出），避免二次包装
+# 统一封装的特征键：中间件据此识别"已是 ApiResponse"的响应（路由显式返回 / 异常 advice 产出）
 ENVELOPE_KEYS = {"code", "message", "data"}
 
+T = TypeVar("T")
 
-class ApiResponse(BaseModel):
-    code: int
-    message: str
-    data: Any = None
+
+class ApiResponse(BaseModel, Generic[T]):
+    code: int = ApiCode.SUCCESS
+    message: str = SUCCESS_MESSAGE
+    data: T | None = None
 
     @classmethod
-    def ok(cls, data: Any = None, message: str = SUCCESS_MESSAGE) -> "ApiResponse":
+    def ok(cls, data: T | None = None, message: str = SUCCESS_MESSAGE) -> "ApiResponse[T]":
         return cls(code=ApiCode.SUCCESS, message=message, data=data)
 
     @classmethod
-    def fail(cls, code: int, message: str) -> "ApiResponse":
+    def fail(cls, code: int, message: str) -> "ApiResponse[T]":
         return cls(code=code, message=message, data=None)
 
 
 def ok_json(data: Any = None, message: str = SUCCESS_MESSAGE) -> JSONResponse:
-    """成功响应（HTTP 200 + code 20000）。"""
+    """成功响应（HTTP 200 + code 20000），供异常 advice 使用。"""
     return JSONResponse(ApiResponse.ok(data, message).model_dump())
 
 
 def fail_json(code: int, message: str) -> JSONResponse:
-    """失败响应（HTTP 200 + 业务错误码）。"""
+    """失败响应（HTTP 200 + 业务错误码），供异常 advice 使用。"""
     return JSONResponse(ApiResponse.fail(code, message).model_dump())

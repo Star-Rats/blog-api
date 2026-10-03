@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.core.api_response import ApiResponse
 from app.core.config import Settings, get_settings
 from app.core.errors import BizError
 from app.core.security import create_access_token, get_current_admin
@@ -22,6 +23,7 @@ from app.schemas.blog import (
     CategoryUpdate,
     LoginRequest,
     LoginResponse,
+    OssConfigOut,
     Page,
     SettingsUpdateRequest,
     TagIn,
@@ -40,17 +42,17 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 # ---- 登录 ----
 
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=ApiResponse[LoginResponse])
 def login(body: LoginRequest, settings: Settings = Depends(get_settings)):
     if body.username != settings.admin_username or body.password != settings.admin_password:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
-    return LoginResponse(access_token=create_access_token(body.username, settings))
+    return ApiResponse.ok(LoginResponse(access_token=create_access_token(body.username, settings)))
 
 
 # ---- 文章管理 ----
 
 
-@router.get("/articles", response_model=Page)
+@router.get("/articles", response_model=ApiResponse[Page])
 def list_admin_articles(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
@@ -63,15 +65,15 @@ def list_admin_articles(
     rows, total = article_repo.list_for_admin(
         db, page, page_size, keyword=keyword, status=status, category_id=category_id,
     )
-    return Page(
+    return ApiResponse.ok(Page(
         items=[admin_article_out(a) for a in rows],
         total=total,
         page=page,
         page_size=page_size,
-    )
+    ))
 
 
-@router.get("/articles/{article_id}", response_model=AdminArticleDetailOut)
+@router.get("/articles/{article_id}", response_model=ApiResponse[AdminArticleDetailOut])
 def get_admin_article(
     article_id: int,
     db: Session = Depends(get_db),
@@ -83,10 +85,10 @@ def get_admin_article(
         raise HTTPException(status_code=404, detail="文章不存在")
     out = admin_article_out(article).model_dump()
     out["body_html"] = article.body_html or ""
-    return AdminArticleDetailOut(**out)
+    return ApiResponse.ok(AdminArticleDetailOut(**out))
 
 
-@router.post("/articles", response_model=AdminArticleOut)
+@router.post("/articles", response_model=ApiResponse[AdminArticleOut])
 def create_article(
     body: ArticleIn,
     db: Session = Depends(get_db),
@@ -96,10 +98,10 @@ def create_article(
     if body.tags is not None:
         taxonomy.set_article_tags(db, article, body.tags)
     db.refresh(article)
-    return admin_article_out(article)
+    return ApiResponse.ok(admin_article_out(article))
 
 
-@router.put("/articles/{article_id}", response_model=AdminArticleOut)
+@router.put("/articles/{article_id}", response_model=ApiResponse[AdminArticleOut])
 def update_article(
     article_id: int,
     body: ArticleUpdate,
@@ -117,10 +119,10 @@ def update_article(
         taxonomy.set_article_tags(db, article, data.pop("tags"))
     article_service.update_article(db, article, data)
     db.refresh(article)
-    return admin_article_out(article)
+    return ApiResponse.ok(admin_article_out(article))
 
 
-@router.delete("/articles/{article_id}")
+@router.delete("/articles/{article_id}", response_model=ApiResponse[dict])
 def delete_article(
     article_id: int,
     db: Session = Depends(get_db),
@@ -130,10 +132,10 @@ def delete_article(
     if article is None:
         raise HTTPException(status_code=404, detail="文章不存在")
     article_service.delete_article(db, article)
-    return {"status": "deleted"}
+    return ApiResponse.ok({"status": "deleted"})
 
 
-@router.post("/articles/import", response_model=AdminArticleDetailOut)
+@router.post("/articles/import", response_model=ApiResponse[AdminArticleDetailOut])
 def import_yuque_article(
     body: dict,
     db: Session = Depends(get_db),
@@ -146,22 +148,24 @@ def import_yuque_article(
     article = yuque_import.import_from_yuque(db, url)
     out = admin_article_out(article).model_dump()
     out["body_html"] = article.body_html or ""
-    return AdminArticleDetailOut(**out)
+    return ApiResponse.ok(AdminArticleDetailOut(**out))
 
 
 # ---- 分类维护 ----
 
 
-@router.get("/categories", response_model=list[CategoryOut])
+@router.get("/categories", response_model=ApiResponse[list[CategoryOut]])
 def list_admin_categories(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
     """全部分类（含隐藏），带文章数。"""
-    return [category_out(category, count) for category, count in category_repo.list_with_article_count(db)]
+    return ApiResponse.ok([
+        category_out(category, count) for category, count in category_repo.list_with_article_count(db)
+    ])
 
 
-@router.post("/categories", response_model=CategoryOut)
+@router.post("/categories", response_model=ApiResponse[CategoryOut])
 def create_category(
     body: CategoryIn,
     db: Session = Depends(get_db),
@@ -176,10 +180,10 @@ def create_category(
         order_num=body.order_num,
         is_visible=body.is_visible,
     )
-    return category_out(category, 0)
+    return ApiResponse.ok(category_out(category, 0))
 
 
-@router.put("/categories/{category_id}", response_model=CategoryOut)
+@router.put("/categories/{category_id}", response_model=ApiResponse[CategoryOut])
 def update_category(
     category_id: int,
     body: CategoryUpdate,
@@ -187,86 +191,86 @@ def update_category(
     _admin: str = Depends(get_current_admin),
 ):
     category = taxonomy.update_category(db, category_id, body.model_dump(exclude_none=True))
-    return category_out(category, category_repo.count_articles(db, category_id))
+    return ApiResponse.ok(category_out(category, category_repo.count_articles(db, category_id)))
 
 
-@router.delete("/categories/{category_id}")
+@router.delete("/categories/{category_id}", response_model=ApiResponse[dict])
 def delete_category(
     category_id: int,
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
     taxonomy.delete_category(db, category_id)
-    return {"status": "deleted"}
+    return ApiResponse.ok({"status": "deleted"})
 
 
 # ---- 标签维护 ----
 
 
-@router.get("/tags", response_model=list[TagOut])
+@router.get("/tags", response_model=ApiResponse[list[TagOut]])
 def list_admin_tags(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    return [tag_out(tag) for tag in tag_repo.list_all(db)]
+    return ApiResponse.ok([tag_out(tag) for tag in tag_repo.list_all(db)])
 
 
-@router.post("/tags", response_model=TagOut)
+@router.post("/tags", response_model=ApiResponse[TagOut])
 def create_tag(
     body: TagIn,
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    return tag_out(taxonomy.create_tag(db, body.name))
+    return ApiResponse.ok(tag_out(taxonomy.create_tag(db, body.name)))
 
 
-@router.put("/tags/{tag_id}", response_model=TagOut)
+@router.put("/tags/{tag_id}", response_model=ApiResponse[TagOut])
 def rename_tag(
     tag_id: int,
     body: TagIn,
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    return tag_out(taxonomy.rename_tag(db, tag_id, body.name))
+    return ApiResponse.ok(tag_out(taxonomy.rename_tag(db, tag_id, body.name)))
 
 
-@router.delete("/tags/{tag_id}")
+@router.delete("/tags/{tag_id}", response_model=ApiResponse[dict])
 def delete_tag(
     tag_id: int,
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
     taxonomy.delete_tag(db, tag_id)
-    return {"status": "deleted"}
+    return ApiResponse.ok({"status": "deleted"})
 
 
 # ---- 图片上传（阿里云 OSS） ----
 
 
-def _oss_config_view(db: Session) -> dict:
+def _oss_config_view(db: Session) -> OssConfigOut:
     config = oss_service.get_oss_config(db)
-    return {
-        "endpoint": config["oss_endpoint"],
-        "access_key_id": config["oss_access_key_id"],
-        "access_key_secret_masked": oss_service.mask_secret(config["oss_access_key_secret"]),
-        "bucket": config["oss_bucket"],
-        "custom_domain": config["oss_custom_domain"],
-        "configured": bool(
+    return OssConfigOut(
+        endpoint=config["oss_endpoint"],
+        access_key_id=config["oss_access_key_id"],
+        access_key_secret_masked=oss_service.mask_secret(config["oss_access_key_secret"]),
+        bucket=config["oss_bucket"],
+        custom_domain=config["oss_custom_domain"],
+        configured=bool(
             config["oss_endpoint"] and config["oss_access_key_id"]
             and config["oss_access_key_secret"] and config["oss_bucket"]
         ),
-    }
+    )
 
 
-@router.get("/oss/config")
+@router.get("/oss/config", response_model=ApiResponse[OssConfigOut])
 def read_oss_config(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    return _oss_config_view(db)
+    return ApiResponse.ok(_oss_config_view(db))
 
 
-@router.put("/oss/config")
+@router.put("/oss/config", response_model=ApiResponse[OssConfigOut])
 def write_oss_config(
     body: dict,
     db: Session = Depends(get_db),
@@ -279,15 +283,15 @@ def write_oss_config(
     if body.get("access_key_secret"):
         data["oss_access_key_secret"] = body["access_key_secret"]
     oss_service.set_oss_config(db, data)
-    return _oss_config_view(db)
+    return ApiResponse.ok(_oss_config_view(db))
 
 
-@router.post("/oss/test")
+@router.post("/oss/test", response_model=ApiResponse[dict])
 def test_oss(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    return oss_service.test_oss(db)
+    return ApiResponse.ok(oss_service.test_oss(db))
 
 
 @router.post("/images")
@@ -308,19 +312,19 @@ def upload_image(
 # ---- 站点设置 ----
 
 
-@router.get("/settings")
+@router.get("/settings", response_model=ApiResponse[dict])
 def read_settings(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    return get_site_settings(db)
+    return ApiResponse.ok(get_site_settings(db))
 
 
-@router.put("/settings")
+@router.put("/settings", response_model=ApiResponse[dict])
 def write_settings(
     body: SettingsUpdateRequest,
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
     update_site_settings(db, body.model_dump(exclude_none=True))
-    return get_site_settings(db)
+    return ApiResponse.ok(get_site_settings(db))

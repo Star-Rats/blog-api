@@ -84,6 +84,27 @@ class AdminArticleOut(BaseModel):
     published_at: str | None = None
 
 
+class ArticleArchiveItem(BaseModel):
+    """归档列表项（含分类/标签，供前端多视角聚合）。"""
+
+    id: int
+    title: str
+    slug: str
+    published_at: str | None = None
+    category_id: int | None = None
+    category_name: str | None = None
+    tags: list[TagOut] = []
+
+
+class OssConfigOut(BaseModel):
+    endpoint: str = ""
+    access_key_id: str = ""
+    access_key_secret_masked: str = ""
+    bucket: str = ""
+    custom_domain: str = ""
+    configured: bool = False
+
+
 class AdminArticleDetailOut(AdminArticleOut):
     """编辑器加载用：含正文 HTML。"""
 

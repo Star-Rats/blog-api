@@ -46,10 +46,11 @@ db/           engine/session（get_db 依赖）与模型
 
 ## 响应约定（重要）
 
-- 所有 `/api` 响应统一为 `ApiResponse{code, message, data}`，HTTP 恒为 200，业务语义由 code 区分（core/api_response.py 的 ApiCode：20000 成功、40001 未登录、40400 不存在、51000 失败、52000 参数错误）
-- 路由函数**返回原始数据**，封装由 main.py 的 `ApiEnvelopeMiddleware` 自动完成（等价 Spring ResponseBodyAdvice），勿在路由里手工包 envelope
-- 异常即 advice：业务错误抛 `BizError`、认证抛 `AuthError`，由 main.py 全局 handler 统一转 ApiResponse；不要在路由里 try/except 拼响应
-- 特例：`/api/admin/images` 返回 wangEditor 约定的 `{errno, ...}` 格式（中间件自动豁免），改这个接口先看中间件的豁免条件
+- 所有 `/api` 路由**显式返回** `ApiResponse.ok(data)`，并用泛型标注响应模型：`@router.get(..., response_model=ApiResponse[SomeOut])`（core/api_response.py）
+- 响应统一为 `{code, message, data}`，HTTP 恒为 200，业务语义由 code 区分（ApiCode：20000 成功、40001 未登录、40400 不存在、51000 失败、52000 参数错误）
+- 异常即 advice：业务错误抛 `BizError`、认证抛 `AuthError`、路由内用 `HTTPException`，由 main.py 全局 handler 统一转 ApiResponse；不要在路由里 try/except 拼响应
+- main.py 的 `ApiEnvelopeMiddleware` 只作兜底（漏包的响应自动包装），不要依赖它
+- 特例：`/api/admin/images` 返回 wangEditor 约定的 `{errno, ...}` 格式（中间件按 errno 键豁免），上传错误直接返回 `{errno:1, message}`
 - 前端在 axios 拦截器统一解包（blog-admin/blog-index 的 src/api.js），改响应结构需同步两端
 
 ## 代码风格
