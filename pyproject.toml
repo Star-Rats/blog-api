@@ -18,6 +18,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "markdown-it-py>=4.2.0",
     "loguru>=0.7.3",
+    "redis>=8.1.0",
 ]
 
 [tool.uv]

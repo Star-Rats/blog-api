@@ -1,6 +1,6 @@
 # Docker 一键部署指南
 
-三个容器：**nginx（网关：前端 + API 反代）** / **api（FastAPI）** / **MySQL 8**。配置与数据全部挂载在宿主机。
+四个容器：**nginx（网关：前端 + API 反代）** / **api（FastAPI）** / **redis（缓存）** / **MySQL 8**。配置与数据全部挂载在宿主机（Redis 为纯缓存不持久化）。
 
 ## 前置要求
 

@@ -45,10 +45,13 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       SITE_TITLE: ${SITE_TITLE:-My Blog}
       LOG_DIR: /app/logs
+      REDIS_URL: redis://redis:6379/0
     volumes:
       - ${DATA_DIR:-./data}/logs/api:/app/logs
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", ".venv/bin/python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
@@ -56,6 +59,18 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  # Redis 缓存（纯缓存，不持久化；数据不挂载宿主机）
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *default_logging
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   # MySQL：数据目录挂载到宿主机 DATA_DIR/mysql
   mysql:

@@ -6,6 +6,7 @@ import re
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core import cache
 from app.core.errors import BizError
 from app.db.models import Article, ArticleTag, Category, Tag
 
@@ -51,6 +52,7 @@ def create_category(db: Session, name: str, slug: str | None = None, **extra) ->
     db.add(category)
     db.commit()
     db.refresh(category)
+    cache.bump()
     return category
 
 
@@ -77,6 +79,7 @@ def update_category(db: Session, category_id: int, data: dict) -> Category:
         category.is_visible = bool(data["is_visible"])
     db.commit()
     db.refresh(category)
+    cache.bump()
     return category
 
 
@@ -89,6 +92,7 @@ def delete_category(db: Session, category_id: int) -> None:
         raise BizError(f"该分类下还有 {count} 篇文章，请先在文章管理中移出")
     db.delete(category)
     db.commit()
+    cache.bump()
 
 
 # ---- 标签 ----
@@ -104,6 +108,7 @@ def create_tag(db: Session, name: str) -> Tag:
     db.add(tag)
     db.commit()
     db.refresh(tag)
+    cache.bump()
     return tag
 
 
@@ -120,6 +125,7 @@ def rename_tag(db: Session, tag_id: int, name: str) -> Tag:
     tag.name = name
     db.commit()
     db.refresh(tag)
+    cache.bump()
     return tag
 
 
@@ -130,6 +136,7 @@ def delete_tag(db: Session, tag_id: int) -> None:
     db.query(ArticleTag).filter(ArticleTag.tag_id == tag_id).delete()
     db.delete(tag)
     db.commit()
+    cache.bump()
 
 
 def set_article_tags(db: Session, article: Article, names: list[str]) -> None:
@@ -156,6 +163,7 @@ def set_article_tags(db: Session, article: Article, names: list[str]) -> None:
     for tag_id in target_ids - current_ids:
         db.add(ArticleTag(article_id=article.id, tag_id=tag_id))
     db.commit()
+    cache.bump()
 
 
 def set_article_category(db: Session, article: Article, category_id: int | None) -> None:
@@ -163,3 +171,4 @@ def set_article_category(db: Session, article: Article, category_id: int | None)
         raise BizError("分类不存在")
     article.category_id = category_id
     db.commit()
+    cache.bump()

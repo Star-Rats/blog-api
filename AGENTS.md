@@ -51,6 +51,13 @@ db/           engine/session（get_db 依赖）与模型
 - 图片上传走 OSS（services/oss.py），OSS 配置存数据库 settings 表（管理端可改，Secret 掩码返回）
 - 语雀导入（services/yuque_import.py）仅支持公开文档，走 `/markdown` 导出端点，无需 Token
 
+## 缓存约定（core/cache.py）
+
+- Redis 可选：`REDIS_URL` 留空或不通时自动降级直连数据库（不可用后 30 秒冷却重试），接口不受影响
+- 读接口 cache-aside：先 `cache.get(key)`，未命中查库后 `cache.set(key, data)`（值一律 model_dump 后的 dict，JSON 序列化）
+- 管理端写操作（articles/taxonomy/settings 各 service 的写函数）commit 后调 `cache.bump()` 全量失效；TTL 600 秒仅作兜底
+- 键统一 `cache:` 前缀；缓存的对象是**响应数据**，浏览量等自增计数不进缓存、直接落库
+
 ## 响应约定（重要）
 
 - 所有 `/api` 路由**显式返回** `ApiResponse.ok(data)`，并用泛型标注响应模型：`@router.get(..., response_model=ApiResponse[SomeOut])`（core/api_response.py）

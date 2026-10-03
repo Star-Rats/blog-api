@@ -9,6 +9,7 @@ import string
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core import cache
 from app.core.errors import BizError
 from app.core.time import utcnow
 from app.db.models import Article
@@ -72,6 +73,7 @@ def create_article(db: Session, data: dict) -> Article:
     db.add(article)
     db.commit()
     db.refresh(article)
+    cache.bump()
     return article
 
 
@@ -101,12 +103,14 @@ def update_article(db: Session, article: Article, data: dict) -> Article:
     derive_fields(article)
     db.commit()
     db.refresh(article)
+    cache.bump()
     return article
 
 
 def delete_article(db: Session, article: Article) -> None:
     db.delete(article)
     db.commit()
+    cache.bump()
 
 
 def count_articles(db: Session, published_only: bool = False) -> int:

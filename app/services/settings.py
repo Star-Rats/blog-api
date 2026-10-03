@@ -4,6 +4,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import cache
 from app.core.config import Settings, get_settings
 from app.db.models import Setting
 
@@ -27,6 +28,9 @@ def set_setting(db: Session, key: str, value: str) -> None:
 
 
 def get_site_settings(db: Session, settings: Settings | None = None) -> dict[str, str]:
+    cached = cache.get("site_settings")
+    if cached is not None:
+        return cached
     settings = settings or get_settings()
     result: dict[str, str] = {
         "site_title": settings.site_title,
@@ -37,6 +41,7 @@ def get_site_settings(db: Session, settings: Settings | None = None) -> dict[str
     for row in db.scalars(select(Setting).where(Setting.key.in_(EDITABLE_KEYS))):
         if row.value:
             result[row.key] = row.value
+    cache.set("site_settings", result)
     return result
 
 
@@ -46,3 +51,4 @@ def update_site_settings(db: Session, data: dict[str, str]) -> None:
             continue
         set_setting(db, key, str(data[key]))
     db.commit()
+    cache.bump()
