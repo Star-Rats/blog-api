@@ -11,7 +11,7 @@
 #   ./deploy/deploy.sh down        停止并移除容器（数据保留在 ./data，配置保留在 .env）
 #
 # 非交互安装（CI/无人值守）通过环境变量传参:
-#   PORT=80 SITE_TITLE=... ADMIN_USERNAME=... ADMIN_PASSWORD=...
+#   DB_ROOT_PASSWORD=... PORT=80 SITE_TITLE=... ADMIN_USERNAME=... ADMIN_PASSWORD=...
 #   WEB_INDEX_DIST=../blog-index/dist WEB_ADMIN_DIST=../blog-admin/dist DATA_DIR=./data
 #
 set -euo pipefail
@@ -58,12 +58,21 @@ cmd_install() {
   else
     info "生成 .env"
     local port="${PORT:-}" title="${SITE_TITLE:-}" admin_user="${ADMIN_USERNAME:-}" admin_password="${ADMIN_PASSWORD:-}"
+    local db_password="${DB_ROOT_PASSWORD:-}"
     if [ -t 0 ]; then
       [ -z "$port" ] && read -r -p "对外端口 [80]: " port
       [ -z "$title" ] && read -r -p "站点标题 [My Blog]: " title
       [ -z "$admin_user" ] && read -r -p "管理员用户名 [admin]: " admin_user
+      while [ -z "$db_password" ]; do
+        read -r -s -p "请输入 MySQL root 密码（必填）: " db_password; echo
+        [ -z "$db_password" ] && warn "密码不能为空，请重新输入"
+      done
     fi
     port="${port:-80}"; title="${title:-My Blog}"; admin_user="${admin_user:-admin}"
+    if [ -z "$db_password" ]; then
+      db_password="$(gen_secret)"
+      info "未指定 MySQL 密码，已随机生成（见 .env 的 DB_ROOT_PASSWORD）"
+    fi
     if [ -z "$admin_password" ]; then
       admin_password="$(gen_secret)"
       info "已生成随机管理员密码: $admin_password"
@@ -74,7 +83,7 @@ PORT=$port
 WORKERS=${WORKERS:-2}
 
 # 数据库（root 密码；数据挂载在 ./data/mysql）
-DB_ROOT_PASSWORD=$(gen_secret)
+DB_ROOT_PASSWORD=$db_password
 DB_NAME=blog
 
 # 管理后台
