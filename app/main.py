@@ -10,12 +10,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import admin, home, public
-from app.core.api_response import (
-    ENVELOPE_KEYS,
-    ApiCode,
-    ApiResponse,
-    fail_json,
-)
+from app.core.api_response import ENVELOPE_KEYS, ApiResponse, fail_json
+from app.core.error_codes import ErrorCode
 from app.core.config import get_settings
 from app.core.errors import AuthError, BizError
 
@@ -101,17 +97,17 @@ async def biz_error_handler(_request: Request, exc: BizError):
 
 @app.exception_handler(AuthError)
 async def auth_error_handler(_request: Request, exc: AuthError):
-    return fail_json(ApiCode.NO_LOGIN, exc.message)
+    return fail_json(ErrorCode.NO_LOGIN, exc.message)
 
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(_request: Request, exc: StarletteHTTPException):
     code_by_status = {
-        401: ApiCode.NO_LOGIN,
-        403: ApiCode.FORBIDDEN,
-        404: ApiCode.NOT_FOUND,
+        401: ErrorCode.NO_LOGIN,
+        403: ErrorCode.FORBIDDEN,
+        404: ErrorCode.NOT_FOUND,
     }
-    code = code_by_status.get(exc.status_code, ApiCode.FAIL)
+    code = code_by_status.get(exc.status_code, ErrorCode.FAIL)
     message = str(exc.detail) if exc.detail else "请求失败"
     return fail_json(code, message)
 
@@ -121,13 +117,13 @@ async def validation_error_handler(_request: Request, exc: RequestValidationErro
     first = exc.errors()[0] if exc.errors() else {}
     loc = ".".join(str(part) for part in first.get("loc", []) if part != "body")
     message = f"参数格式不正确: {loc}: {first.get('msg', '')}" if loc else "参数格式不正确"
-    return fail_json(ApiCode.VALID_ERROR, message)
+    return fail_json(ErrorCode.VALID_ERROR, message)
 
 
 @app.exception_handler(Exception)
 async def unexpected_error_handler(_request: Request, exc: Exception):
     logger.exception("未处理异常")
-    return fail_json(ApiCode.SYSTEM_ERROR, "系统异常，请稍后重试")
+    return fail_json(ErrorCode.SYSTEM_ERROR, "系统异常，请稍后重试")
 
 
 @app.get("/api/health", response_model=ApiResponse[dict], tags=["system"])

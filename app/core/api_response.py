@@ -1,7 +1,7 @@
 """统一 ApiResponse 封装（对齐 Spring RestControllerAdvice 风格）。
 
 所有 /api 响应统一为 {"code", "message", "data"}，HTTP 状态恒为 200，
-业务语义由 code 区分（沿用原 Spring 项目的错误码段位）。
+业务语义由 code 区分（错误码常量见 core/error_codes.py）。
 
 路由层显式返回 `ApiResponse.ok(data)`，并用泛型标注响应模型：
     @router.get("/x", response_model=ApiResponse[SomeOut])
@@ -13,22 +13,12 @@ main.py 的 ApiEnvelopeMiddleware 作为兜底：漏包的响应自动包装，
 """
 from __future__ import annotations
 
-from enum import IntEnum
 from typing import Any, Generic, TypeVar
 
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-
-class ApiCode(IntEnum):
-    SUCCESS = 20000
-    NO_LOGIN = 40001
-    FORBIDDEN = 40300
-    NOT_FOUND = 40400
-    SYSTEM_ERROR = 50000
-    FAIL = 51000
-    VALID_ERROR = 52000  # 参数格式不正确
-
+from app.core.error_codes import ErrorCode
 
 SUCCESS_MESSAGE = "操作成功"
 
@@ -39,13 +29,13 @@ T = TypeVar("T")
 
 
 class ApiResponse(BaseModel, Generic[T]):
-    code: int = ApiCode.SUCCESS
+    code: int = ErrorCode.SUCCESS
     message: str = SUCCESS_MESSAGE
     data: T | None = None
 
     @classmethod
     def ok(cls, data: T | None = None, message: str = SUCCESS_MESSAGE) -> "ApiResponse[T]":
-        return cls(code=ApiCode.SUCCESS, message=message, data=data)
+        return cls(code=ErrorCode.SUCCESS, message=message, data=data)
 
     @classmethod
     def fail(cls, code: int, message: str) -> "ApiResponse[T]":
