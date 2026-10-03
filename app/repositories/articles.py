@@ -105,7 +105,7 @@ def list_for_admin(
     stmt = (
         select(Article)
         .options(joinedload(Article.category), joinedload(Article.tags))
-        .order_by(Article.updated_at.desc(), Article.id.desc())
+        .order_by(Article.gmt_modify.desc(), Article.id.desc())
     )
     if keyword:
         like = f"%{keyword.strip()}%"

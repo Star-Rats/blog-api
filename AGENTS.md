@@ -44,6 +44,8 @@ db/           engine/session（get_db 依赖）与模型
 
 ## 领域规则（改动前先读）
 
+- 时间字段命名规范：所有表统一 `gmt_create`（创建时间，default=utcnow）/ `gmt_modify`（更新时间，onupdate=utcnow）；API 响应字段名保持 `created_at`/`updated_at`（converters.py 映射）。历史库的迁移已内置在 scripts/init_db.py（幂等）
+
 - slug：仅小写字母/数字/连字符；留空自动生成 8 位随机串，冲突自动加后缀（services/articles.py）
 - description / cover 留空 = 自动派生（正文前 120 字 / 正文第一张图），`derive_fields` 统一处理
 - 前台可见 = `status == 1`（草稿不可见）；`published_at` 首次发布写入，之后保留

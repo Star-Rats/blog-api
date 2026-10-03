@@ -42,8 +42,8 @@ class Category(Base):
     cover: Mapped[str | None] = mapped_column(String(1024))
     order_num: Mapped[int] = mapped_column(Integer, default=0)
     is_visible: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=utcnow)
+    gmt_create: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    gmt_modify: Mapped[datetime | None] = mapped_column(DateTime, onupdate=utcnow)
 
     articles: Mapped[list["Article"]] = relationship(back_populates="category")
 
@@ -72,8 +72,8 @@ class Article(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
     # 本站浏览量
     views: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=utcnow)
+    gmt_create: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    gmt_modify: Mapped[datetime | None] = mapped_column(DateTime, onupdate=utcnow)
 
     category: Mapped["Category"] = relationship(back_populates="articles")
     tags: Mapped[list["Tag"]] = relationship(
@@ -86,7 +86,7 @@ class Tag(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    gmt_create: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     articles: Mapped[list["Article"]] = relationship(
         secondary="article_tags", back_populates="tags"
@@ -113,4 +113,4 @@ class Setting(Base):
 
     key: Mapped[str] = mapped_column(String(50), primary_key=True)
     value: Mapped[str] = mapped_column(Text, default="")
-    updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=utcnow)
+    gmt_modify: Mapped[datetime | None] = mapped_column(DateTime, onupdate=utcnow)

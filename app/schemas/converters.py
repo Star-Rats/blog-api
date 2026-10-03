@@ -28,7 +28,7 @@ def article_summary(article: Article) -> ArticleSummary:
         word_count=article.word_count,
         status=article.status,
         published_at=to_iso(article.published_at),
-        updated_at=to_iso(article.updated_at),
+        updated_at=to_iso(article.gmt_modify),
     )
 
 
@@ -58,7 +58,7 @@ def admin_article_out(article: Article) -> AdminArticleOut:
         tags=[tag_out(tag) for tag in article.tags],
         views=article.views,
         word_count=article.word_count,
-        created_at=to_iso(article.created_at),
-        updated_at=to_iso(article.updated_at),
+        created_at=to_iso(article.gmt_create),
+        updated_at=to_iso(article.gmt_modify),
         published_at=to_iso(article.published_at),
     )
