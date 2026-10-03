@@ -1,17 +1,16 @@
-"""首页聚合接口。"""
+"""首页聚合与「关于」接口。"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.base import get_db
-from app.db.models import Article, Category, Tag
+from app.repositories import articles as article_repo
+from app.repositories import categories as category_repo
+from app.repositories import tags as tag_repo
 from app.schemas.blog import AboutOut, HomeOut, HomeStats, TagOut
 from app.schemas.converters import article_summary, category_out
 from app.services.settings import get_site_settings
-
-from app.api.public import _category_counts, _published_stmt
 
 router = APIRouter(prefix="/api", tags=["home"])
 
@@ -24,32 +23,18 @@ def get_about(db: Session = Depends(get_db)):
 
 @router.get("/home", response_model=HomeOut)
 def get_home(db: Session = Depends(get_db)):
-    counts = _category_counts(db)
-    article_count = sum(counts.values())
-    category_rows = db.scalars(
-        select(Category)
-        .where(Category.is_visible.is_(True))
-        .order_by(Category.order_num.asc(), Category.id.asc())
-    ).all()
-    tag_rows = db.execute(
-        select(Tag, func.count(Article.id))
-        .join(Article.tags)
-        .where(Article.status == 1)
-        .group_by(Tag.id)
-        .order_by(func.count(Article.id).desc())
-        .limit(20)
-    ).all()
-    recent = db.scalars(
-        _published_stmt().order_by(Article.published_at.desc(), Article.id.desc()).limit(6)
-    ).unique().all()
+    counts = category_repo.published_counts(db)
+    visible_categories = category_repo.list_visible(db)
+    tag_rows = tag_repo.list_with_published_count(db, limit=20)
+    recent = article_repo.recent_published(db, 6)
     return HomeOut(
         site=get_site_settings(db),
         stats=HomeStats(
-            article_count=article_count,
-            category_count=len(category_rows),
+            article_count=article_repo.count_published(db),
+            category_count=len(visible_categories),
             tag_count=len(tag_rows),
         ),
         recent_articles=[article_summary(a) for a in recent],
-        categories=[category_out(c, counts.get(c.id, 0)) for c in category_rows],
+        categories=[category_out(c, counts.get(c.id, 0)) for c in visible_categories],
         tags=[TagOut(id=t.id, name=t.name) for t, _count in tag_rows],
     )

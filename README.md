@@ -110,6 +110,7 @@ blog/                          # 后端（uv 管理，pyproject.toml + uv.lock�
 │   ├── core/                  # 配置（dev/prod）、JWT、异常、时间工具
 │   ├── db/                    # engine/session + models（articles/categories/tags/article_tags/settings）
 │   ├── schemas/               # Pydantic 请求/响应模型
+│   ├── repositories/          # 数据访问层：articles / categories / tags 查询封装
 │   ├── services/
 │   │   ├── articles.py        # 文章 CRUD、slug/摘要/字数/封面派生
 │   │   ├── taxonomy.py        # 分类/标签维护、文章指派

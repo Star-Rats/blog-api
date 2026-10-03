@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.core.errors import BizError
 from app.core.security import create_access_token, get_current_admin
 from app.db.base import get_db
-from app.db.models import Article, Category, Tag
+from app.repositories import articles as article_repo
+from app.repositories import categories as category_repo
+from app.repositories import tags as tag_repo
 from app.schemas.blog import (
     AdminArticleDetailOut,
     AdminArticleOut,
@@ -58,20 +59,9 @@ def list_admin_articles(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    stmt = (
-        select(Article)
-        .options(joinedload(Article.category), joinedload(Article.tags))
-        .order_by(Article.updated_at.desc(), Article.id.desc())
+    rows, total = article_repo.list_for_admin(
+        db, page, page_size, keyword=keyword, status=status, category_id=category_id,
     )
-    if keyword:
-        like = f"%{keyword.strip()}%"
-        stmt = stmt.where(Article.title.like(like))
-    if status is not None:
-        stmt = stmt.where(Article.status == status)
-    if category_id is not None:
-        stmt = stmt.where(Article.category_id == category_id)
-    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
-    rows = db.scalars(stmt.offset((page - 1) * page_size).limit(page_size)).unique().all()
     return Page(
         items=[admin_article_out(a) for a in rows],
         total=total,
@@ -87,11 +77,7 @@ def get_admin_article(
     _admin: str = Depends(get_current_admin),
 ):
     """单篇文章详情（含 body_html，供编辑器加载）。"""
-    article = db.scalar(
-        select(Article)
-        .options(joinedload(Article.category), joinedload(Article.tags))
-        .where(Article.id == article_id)
-    )
+    article = article_repo.get_by_id(db, article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="文章不存在")
     out = admin_article_out(article).model_dump()
@@ -119,11 +105,7 @@ def update_article(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    article = db.scalar(
-        select(Article)
-        .options(joinedload(Article.tags))
-        .where(Article.id == article_id)
-    )
+    article = article_repo.get_by_id(db, article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="文章不存在")
     # 只处理请求里显式给出的字段（显式传 null 分类表示清除）
@@ -143,7 +125,7 @@ def delete_article(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    article = db.get(Article, article_id)
+    article = article_repo.get_by_id(db, article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="文章不存在")
     article_service.delete_article(db, article)
@@ -175,13 +157,7 @@ def list_admin_categories(
     _admin: str = Depends(get_current_admin),
 ):
     """全部分类（含隐藏），带文章数。"""
-    rows = db.execute(
-        select(Category, func.count(Article.id))
-        .outerjoin(Article, Article.category_id == Category.id)
-        .group_by(Category.id)
-        .order_by(Category.order_num.asc(), Category.id.asc())
-    ).all()
-    return [category_out(category, count or 0) for category, count in rows]
+    return [category_out(category, count) for category, count in category_repo.list_with_article_count(db)]
 
 
 @router.post("/categories", response_model=CategoryOut)
@@ -210,10 +186,7 @@ def update_category(
     _admin: str = Depends(get_current_admin),
 ):
     category = taxonomy.update_category(db, category_id, body.model_dump(exclude_none=True))
-    count = db.scalar(
-        select(func.count(Article.id)).where(Article.category_id == category_id)
-    ) or 0
-    return category_out(category, count)
+    return category_out(category, category_repo.count_articles(db, category_id))
 
 
 @router.delete("/categories/{category_id}")
@@ -234,8 +207,7 @@ def list_admin_tags(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    tags = db.scalars(select(Tag).order_by(Tag.name.asc())).all()
-    return [tag_out(tag) for tag in tags]
+    return [tag_out(tag) for tag in tag_repo.list_all(db)]
 
 
 @router.post("/tags", response_model=TagOut)
