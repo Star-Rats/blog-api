@@ -21,8 +21,10 @@ services:
       # 前端构建产物挂载（在 .env 中按部署布局调整路径）
       - ${WEB_INDEX_DIST:-../blog-index/dist}:/usr/share/nginx/web/index:ro
       - ${WEB_ADMIN_DIST:-../blog-admin/dist}:/usr/share/nginx/web/admin:ro
+      - ${DATA_DIR:-./data}/logs/nginx:/var/log/nginx
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
   # 博客后端
   api:
@@ -42,6 +44,9 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       SITE_TITLE: ${SITE_TITLE:-My Blog}
+      LOG_DIR: /app/logs
+    volumes:
+      - ${DATA_DIR:-./data}/logs/api:/app/logs
     depends_on:
       mysql:
         condition: service_healthy

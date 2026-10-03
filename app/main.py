@@ -1,6 +1,7 @@
 """应用入口：uv run uvicorn app.main:app --reload"""
 import json
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -17,6 +18,21 @@ from app.core.errors import AuthError, BizError
 from app.core.middlewares import AuthMiddleware, HttpLogMiddleware
 
 logger = logging.getLogger("blog-api")
+
+# 生产环境（Docker 部署）把日志同时落盘到挂载目录：50MB × 4 滚动，总上限 200MB
+if log_dir := get_settings().log_dir:
+    Path(log_dir).mkdir(parents=True, exist_ok=True)
+    from loguru import logger as loguru_logger
+
+    loguru_logger.add(
+        f"{log_dir}/api.log",
+        rotation="50 MB",
+        retention=3,
+        encoding="utf-8",
+        enqueue=True,  # 多 worker 进程安全
+        level="INFO",
+    )
+    loguru_logger.info("文件日志已启用: {}", log_dir)
 
 app = FastAPI(
     title="Blog API",

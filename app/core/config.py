@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     # 「导入语雀文章」抓取公开文档的基址（一般不用改）
     yuque_import_base: str = "https://www.yuque.com"
 
+    # ---- 日志 ----
+    # 设置后 loguru 同时写文件到该目录（50MB×4 滚动）；Docker 部署由 compose 注入，本地开发留空仅输出控制台
+    log_dir: str = ""
+
     # ---- 管理端 ----
     admin_username: str = "admin"
     admin_password: str = "admin123"
