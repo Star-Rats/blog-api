@@ -79,7 +79,14 @@ gunzip < backups/blog-xxx.sql.gz | docker compose exec -T mysql sh -c 'exec mysq
 
 ## HTTPS
 
-最简单的方式是在宿主机另跑一层证书网关（certbot/caddy 监听 443，反代到 `127.0.0.1:$PORT`）；或自行把证书目录挂载进 nginx 容器并在 `deploy/nginx/conf.d/blog.conf` 增加 443 server 块。
+nginx 同时监听 80 和 443（同一份站点配置）。**证书目录 `CERT_DIR`（默认 `./data/certs`）缺少证书时，install 会自动生成自签名证书**（浏览器提示不受信任，接口/功能不受影响）。
+
+使用正式证书：
+
+1. 将证书放到 `CERT_DIR` 下，命名为 `fullchain.pem` / `privkey.pem`（Let's Encrypt 的 `fullchain.pem`/`privkey.pem` 直接对应）
+2. `./deploy/deploy.sh restart`，然后 `docker compose exec nginx nginx -t` 可校验
+
+需要在 `.env` 调整：`PORT_SSL`（443 端口映射）、`SSL_DOMAIN`（自签名证书的 CN）、`CERT_DIR`。
 
 ## 安全清单
 

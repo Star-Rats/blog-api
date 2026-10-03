@@ -11,7 +11,8 @@
 #   ./deploy/deploy.sh down        停止并移除容器（数据保留在 ./data，配置保留在 .env）
 #
 # 非交互安装（CI/无人值守）通过环境变量传参:
-#   DB_ROOT_PASSWORD=... PORT=80 SITE_TITLE=... ADMIN_USERNAME=... ADMIN_PASSWORD=...
+#   DB_ROOT_PASSWORD=... PORT=80 PORT_SSL=443 SSL_DOMAIN=... CERT_DIR=./data/certs
+#   SITE_TITLE=... ADMIN_USERNAME=... ADMIN_PASSWORD=...
 #   WEB_INDEX_DIST=../blog-index/dist WEB_ADMIN_DIST=../blog-admin/dist DATA_DIR=./data
 #
 set -euo pipefail
@@ -45,6 +46,20 @@ build_images() {
 need_docker() {
   command -v docker >/dev/null 2>&1 || fail "未安装 Docker（yum install docker / apt install docker.io，或官方脚本 curl -fsSL https://get.docker.com | sh）"
   docker compose version >/dev/null 2>&1 || fail "缺少 Compose 插件（docker compose version 无法执行）"
+}
+
+generate_certs() {
+  # 证书缺失时生成自签名证书；正式证书直接替换 CERT_DIR 下的 fullchain.pem / privkey.pem
+  load_env
+  local cert_dir="${CERT_DIR:-./data/certs}"
+  mkdir -p "$cert_dir"
+  if [ -f "$cert_dir/fullchain.pem" ] && [ -f "$cert_dir/privkey.pem" ]; then
+    info "HTTPS 证书已存在: $cert_dir"
+    return
+  fi
+  command -v openssl >/dev/null 2>&1 || fail "未找到 openssl，无法生成自签名证书（也可手动放置 fullchain.pem/privkey.pem）"
+  info "生成自签名证书（浏览器会提示不受信任；正式证书替换文件后 restart nginx 即可）"
+  openssl req -x509 -nodes -newkey rsa:2048 -days 3650     -keyout "$cert_dir/privkey.pem" -out "$cert_dir/fullchain.pem"     -subj "/CN=${SSL_DOMAIN:-localhost}" 2>/dev/null     || fail "自签名证书生成失败"
 }
 
 # ---------- 子命令 ----------
@@ -102,6 +117,11 @@ WORKERS=${WORKERS:-2}
 DB_ROOT_PASSWORD=$db_password
 DB_NAME=blog
 
+# HTTPS（443 对外端口与证书目录；证书缺失时自动生成自签名证书）
+PORT_SSL=${PORT_SSL:-443}
+SSL_DOMAIN="${SSL_DOMAIN:-localhost}"
+CERT_DIR="${CERT_DIR:-./data/certs}"
+
 # 管理后台
 ADMIN_USERNAME=$admin_user
 ADMIN_PASSWORD=$admin_password
@@ -121,6 +141,7 @@ EOF
     warn "前端 dist 不存在时 nginx 会返回 404，请确认已构建两个前端仓库（npm run build）且目录与 .env 中路径一致"
   fi
   load_env
+  generate_certs
 
   build_images
 
@@ -156,6 +177,7 @@ cmd_update() {
   load_env
   cd "$APP_DIR"
   git pull --ff-only || warn "git pull 未生效（有本地改动？），使用当前代码继续"
+  generate_certs
   build_images
   $DC exec -T api .venv/bin/python scripts/init_db.py
   docker image prune -f >/dev/null 2>&1 || true
