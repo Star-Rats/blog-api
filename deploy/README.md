@@ -21,7 +21,7 @@ cd /opt/blog/blog-api
 ./deploy/deploy.sh install
 ```
 
-脚本会：生成 `.env`（自动生成随机 JWT 密钥与管理员密码）→ 构建镜像 → 启动 nginx/api/mysql → 建库建表 → 健康检查。完成后按提示访问：
+脚本会：交互询问 **MySQL root 密码（必填）** 与 **管理员密码**（两次输入确认，留空自动生成）→ 生成 `.env`（JWT 密钥自动生成）→ 生成 HTTPS 证书（缺失时自签名）→ 构建镜像 → 启动 nginx/api/redis/mysql → 建库建表 → 健康检查。完成后按提示访问：
 
 - 主站：`http://服务器IP/`
 - 管理后台：`http://服务器IP/admin/`
@@ -33,10 +33,13 @@ cd /opt/blog/blog-api
 
 | 变量 | 默认 | 说明 |
 | --- | --- | --- |
-| `PORT` | `80` | nginx 对外端口 |
+| `PORT` | `80` | nginx 对外端口（HTTP） |
+| `PORT_SSL` | `443` | nginx 对外端口（HTTPS） |
 | `WEB_INDEX_DIST` | `../blog-index/dist` | 主站构建产物目录 |
 | `WEB_ADMIN_DIST` | `../blog-admin/dist` | 后台构建产物目录 |
-| `DATA_DIR` | `./data` | MySQL 数据挂载目录 |
+| `DATA_DIR` | `./data` | 数据挂载目录（MySQL 数据、日志、证书） |
+| `CERT_DIR` | `./data/certs` | HTTPS 证书目录（fullchain.pem / privkey.pem） |
+| `SSL_DOMAIN` | `localhost` | 自签名证书的 CN |
 | `WORKERS` | `2` | uvicorn 进程数 |
 | `SITE_TITLE` / `ADMIN_USERNAME` / `ADMIN_PASSWORD` / `JWT_SECRET` | 随机/默认 | 均可在生成后修改 |
 
@@ -53,10 +56,35 @@ export DOCKER_BUILD_PROXY=http://宿主机代理IP:端口   # 容器内访问宿
 
 镜像拉取（nginx/uv 基础镜像）走 Docker daemon，按 Docker 官方文档为 daemon 配置代理，或先 `docker pull` 好所需镜像。
 
+## 代码更新
+
+**后端有改动**（blog-api 仓库）：
+
+```bash
+cd /opt/blog/blog-api
+./deploy/deploy.sh update
+```
+
+一条命令完成：`git pull` 拉最新代码 → 重建 API 镜像 → 滚动重启（只有代码变化的容器会重建，nginx/redis/mysql 不动）→ 增量建表 → 健康检查。
+
+**前端有改动**（blog-index / blog-admin 仓库）：`dist/` 是直接挂载进 nginx 的，不走镜像，在各自仓库里更新并重新构建即可，**构建完立即生效，无需重启任何容器**：
+
+```bash
+cd /opt/blog/blog-index && git pull && npm install && npm run build
+cd /opt/blog/blog-admin && git pull && npm install && npm run build
+```
+
+**只改了配置**（`.env` 或 `deploy/nginx/`）：
+
+```bash
+./deploy/deploy.sh restart
+# 只改了 nginx 配置可先校验语法：docker compose exec nginx nginx -t
+```
+
 ## 日常运维
 
 ```bash
-./deploy/deploy.sh update     # 更新：git pull → 重建 → 增量建表 → 重启
+./deploy/deploy.sh update     # 更新后端：git pull → 重建 → 增量建表 → 重启
 ./deploy/deploy.sh backup     # 备份数据库到 backups/*.sql.gz（建议 crontab 每日一次）
 ./deploy/deploy.sh logs api   # 看日志（api/mysql/nginx）
 ./deploy/deploy.sh status     # 容器状态
