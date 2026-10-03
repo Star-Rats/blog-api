@@ -37,6 +37,11 @@ load_env() {
 }
 
 build_images() {
+  if [ "${SKIP_BUILD:-0}" = "1" ]; then
+    info "SKIP_BUILD=1：跳过镜像构建，直接使用本地已有镜像（离线部署用 docker load 导入）"
+    $DC up -d --no-build
+    return
+  fi
   info "构建 API 镜像..."
   DOCKER_BUILD_PROXY="$DOCKER_BUILD_PROXY" $DC build
   info "启动 nginx / api / mysql..."
