@@ -75,6 +75,8 @@ VITE_API_BASE=https://api.example.com npm run build
 
 ## API 一览
 
+所有 `/api` 响应为统一 `ApiResponse{code, message, data}`（HTTP 200，业务码区分成功/失败：20000 成功、40001 未登录、40400 不存在、51000 失败、52000 参数错误），前端在 axios 拦截器统一解包。下表"说明"中描述的均为 `data` 内容。
+
 ### 前台（公开）
 
 | 方法 | 路径 | 说明 |

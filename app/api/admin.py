@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
@@ -295,9 +296,12 @@ def upload_image(
     db: Session = Depends(get_db),
     _admin: str = Depends(get_current_admin),
 ):
-    """编辑器图片上传；返回 wangEditor 约定的 {errno, data:{url}} 结构。"""
-    data = file.file.read()
-    url = oss_service.upload_image(db, file.filename or "img", file.content_type or "", data)
+    """编辑器图片上传；返回 wangEditor 约定的 {errno, data:{url}} 结构（不走 ApiResponse 封装）。"""
+    try:
+        data = file.file.read()
+        url = oss_service.upload_image(db, file.filename or "img", file.content_type or "", data)
+    except BizError as e:
+        return JSONResponse({"errno": 1, "message": e.message})
     return {"errno": 0, "data": {"url": url, "alt": file.filename or "", "href": url}}
 
 
