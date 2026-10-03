@@ -63,6 +63,22 @@ cmd_install() {
       [ -z "$port" ] && read -r -p "对外端口 [80]: " port
       [ -z "$title" ] && read -r -p "站点标题 [My Blog]: " title
       [ -z "$admin_user" ] && read -r -p "管理员用户名 [admin]: " admin_user
+      # 管理员密码：两次输入确认；留空自动生成
+      if [ -z "$admin_password" ]; then
+        while true; do
+          read -r -s -p "设置管理员密码（留空自动生成随机密码）: " admin_password; echo
+          if [ -z "$admin_password" ]; then
+            admin_password="$(gen_secret)"
+            info "已自动生成管理员密码: $admin_password"
+            break
+          fi
+          local admin_password_confirm=""
+          read -r -s -p "再次输入确认: " admin_password_confirm; echo
+          [ "$admin_password" = "$admin_password_confirm" ] && break
+          warn "两次输入不一致，请重新设置"
+          admin_password=""
+        done
+      fi
       while [ -z "$db_password" ]; do
         read -r -s -p "请输入 MySQL root 密码（必填）: " db_password; echo
         [ -z "$db_password" ] && warn "密码不能为空，请重新输入"
