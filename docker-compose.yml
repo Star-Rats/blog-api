@@ -1,10 +1,18 @@
 name: blog
 
+# 容器日志统一滚动：50MB × 4 个文件 = 上限 200MB
+x-logging: &default_logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "4"
+
 services:
   # 网关：托管两个前端构建产物 + 反代 API
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
+    logging: *default_logging
     ports:
       - "${PORT:-80}:80"
     volumes:
@@ -18,13 +26,9 @@ services:
 
   # 博客后端
   api:
-    build:
-      context: .
-      # 构建期代理（可选）：.env 中设置 DOCKER_BUILD_PROXY=http://宿主机IP:端口
-      args:
-        HTTP_PROXY: ${DOCKER_BUILD_PROXY:-}
-        HTTPS_PROXY: ${DOCKER_BUILD_PROXY:-}
+    build: .
     restart: unless-stopped
+    logging: *default_logging
     environment:
       APP_ENV: prod
       PORT: "8000"
@@ -52,6 +56,7 @@ services:
   mysql:
     image: mysql:8.0.30
     restart: unless-stopped
+    logging: *default_logging
     environment:
       TZ: Asia/Shanghai
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}

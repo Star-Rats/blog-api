@@ -64,6 +64,8 @@ export DOCKER_BUILD_PROXY=http://宿主机代理IP:端口   # 容器内访问宿
 ./deploy/deploy.sh down       # 移除容器（数据/配置保留）
 ```
 
+容器日志（loguru 输出 / nginx / MySQL 的 stdout）由 Docker json-file 驱动滚动：单文件 50MB、最多 4 个文件，**总上限 200MB**（见 docker-compose.yml 的 `x-logging`）。查看日志用 `./deploy/deploy.sh logs [api|mysql|nginx]`，勿直接依赖宿主机上不存在的日志文件。
+
 恢复备份：
 
 ```bash
