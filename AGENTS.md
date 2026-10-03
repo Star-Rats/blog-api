@@ -13,7 +13,7 @@
 
 ```bash
 uv sync                                        # 安装依赖（自动安装 Python 3.14）
-uv run uvicorn app.main:app --reload           # 本地启动（Swagger: /docs）
+uv run uvicorn app.main:app --reload --no-access-log  # 本地启动（访问日志由 HttpLogMiddleware 统一记录）
 uv run python scripts/init_db.py               # 建库建表（自动创建数据库）
 ./deploy/deploy.sh install|update|backup       # Docker 生产部署（见 deploy/README.md）
 uv run python -m compileall -q app scripts     # 语法检查
@@ -30,6 +30,13 @@ services/     业务逻辑：写操作与事务边界（commit 在 service 内�
 schemas/      Pydantic 请求/响应模型；ORM → 响应转换在 schemas/converters.py
 db/           engine/session（get_db 依赖）与模型
 ```
+
+## 统一中间件（core/middlewares.py）
+
+- **AuthMiddleware**：管理端统一鉴权，保护 `/api/admin/**`（除 `/api/admin/login`），校验 Bearer JWT 后写入 `request.state.admin_username`。admin 路由无需再挂 `get_current_admin` 依赖
+- **HttpLogMiddleware**：访问日志（loguru），每请求一条，同时含请求体（脱敏+截断）与响应体（截断）；业务失败（code != 20000）记 WARNING，multipart 不记录内容
+- 中间件注册顺序（main.py）：Envelope（内）→ Auth → HttpLog → CORS（外）；新中间件按需插入并注意顺序
+- 日志跳过 /docs、/openapi.json；`--no-access-log` 关闭 uvicorn 自带 access log
 
 - 新查询先加到对应 repository，路由只调用
 - repository 只做数据存取；业务校验、跨操作事务放 services

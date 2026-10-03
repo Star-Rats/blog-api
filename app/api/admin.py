@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.api_response import ApiResponse
 from app.core.config import Settings, get_settings
 from app.core.errors import BizError
-from app.core.security import create_access_token, get_current_admin
+from app.core.security import create_access_token
 from app.db.base import get_db
 from app.repositories import articles as article_repo
 from app.repositories import categories as category_repo
@@ -60,7 +60,6 @@ def list_admin_articles(
     status: int | None = Query(None, ge=0, le=1, description="0 草稿 / 1 已发布"),
     category_id: int | None = None,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     rows, total = article_repo.list_for_admin(
         db, page, page_size, keyword=keyword, status=status, category_id=category_id,
@@ -77,7 +76,6 @@ def list_admin_articles(
 def get_admin_article(
     article_id: int,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     """单篇文章详情（含 body_html，供编辑器加载）。"""
     article = article_repo.get_by_id(db, article_id)
@@ -92,7 +90,6 @@ def get_admin_article(
 def create_article(
     body: ArticleIn,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     article = article_service.create_article(db, body.model_dump())
     if body.tags is not None:
@@ -106,7 +103,6 @@ def update_article(
     article_id: int,
     body: ArticleUpdate,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     article = article_repo.get_by_id(db, article_id)
     if article is None:
@@ -126,7 +122,6 @@ def update_article(
 def delete_article(
     article_id: int,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     article = article_repo.get_by_id(db, article_id)
     if article is None:
@@ -139,7 +134,6 @@ def delete_article(
 def import_yuque_article(
     body: dict,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     """按公开语雀文档链接导入为可编辑草稿。"""
     url = (body.get("url") or "").strip()
@@ -157,7 +151,6 @@ def import_yuque_article(
 @router.get("/categories", response_model=ApiResponse[list[CategoryOut]])
 def list_admin_categories(
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     """全部分类（含隐藏），带文章数。"""
     return ApiResponse.ok([
@@ -169,7 +162,6 @@ def list_admin_categories(
 def create_category(
     body: CategoryIn,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     category = taxonomy.create_category(
         db,
@@ -188,7 +180,6 @@ def update_category(
     category_id: int,
     body: CategoryUpdate,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     category = taxonomy.update_category(db, category_id, body.model_dump(exclude_none=True))
     return ApiResponse.ok(category_out(category, category_repo.count_articles(db, category_id)))
@@ -198,7 +189,6 @@ def update_category(
 def delete_category(
     category_id: int,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     taxonomy.delete_category(db, category_id)
     return ApiResponse.ok({"status": "deleted"})
@@ -210,7 +200,6 @@ def delete_category(
 @router.get("/tags", response_model=ApiResponse[list[TagOut]])
 def list_admin_tags(
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     return ApiResponse.ok([tag_out(tag) for tag in tag_repo.list_all(db)])
 
@@ -219,7 +208,6 @@ def list_admin_tags(
 def create_tag(
     body: TagIn,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     return ApiResponse.ok(tag_out(taxonomy.create_tag(db, body.name)))
 
@@ -229,7 +217,6 @@ def rename_tag(
     tag_id: int,
     body: TagIn,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     return ApiResponse.ok(tag_out(taxonomy.rename_tag(db, tag_id, body.name)))
 
@@ -238,7 +225,6 @@ def rename_tag(
 def delete_tag(
     tag_id: int,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     taxonomy.delete_tag(db, tag_id)
     return ApiResponse.ok({"status": "deleted"})
@@ -265,7 +251,6 @@ def _oss_config_view(db: Session) -> OssConfigOut:
 @router.get("/oss/config", response_model=ApiResponse[OssConfigOut])
 def read_oss_config(
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     return ApiResponse.ok(_oss_config_view(db))
 
@@ -274,7 +259,6 @@ def read_oss_config(
 def write_oss_config(
     body: dict,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     """secret 留空表示保持不变。"""
     data = {f"oss_{k}": v for k, v in body.items() if k in ("endpoint", "bucket", "custom_domain")}
@@ -289,7 +273,6 @@ def write_oss_config(
 @router.post("/oss/test", response_model=ApiResponse[dict])
 def test_oss(
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     return ApiResponse.ok(oss_service.test_oss(db))
 
@@ -298,7 +281,6 @@ def test_oss(
 def upload_image(
     file: UploadFile,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     """编辑器图片上传；返回 wangEditor 约定的 {errno, data:{url}} 结构（不走 ApiResponse 封装）。"""
     try:
@@ -315,7 +297,6 @@ def upload_image(
 @router.get("/settings", response_model=ApiResponse[dict])
 def read_settings(
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     return ApiResponse.ok(get_site_settings(db))
 
@@ -324,7 +305,6 @@ def read_settings(
 def write_settings(
     body: SettingsUpdateRequest,
     db: Session = Depends(get_db),
-    _admin: str = Depends(get_current_admin),
 ):
     update_site_settings(db, body.model_dump(exclude_none=True))
     return ApiResponse.ok(get_site_settings(db))

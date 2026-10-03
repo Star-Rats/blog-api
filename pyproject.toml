@@ -17,6 +17,7 @@ dependencies = [
     "oss2>=2.19.1",
     "python-multipart>=0.0.32",
     "markdown-it-py>=4.2.0",
+    "loguru>=0.7.3",
 ]
 
 [tool.uv]

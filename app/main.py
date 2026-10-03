@@ -14,6 +14,7 @@ from app.core.api_response import ENVELOPE_KEYS, ApiResponse, fail_json
 from app.core.error_codes import ErrorCode
 from app.core.config import get_settings
 from app.core.errors import AuthError, BizError
+from app.core.middlewares import AuthMiddleware, HttpLogMiddleware
 
 logger = logging.getLogger("blog-api")
 
@@ -74,6 +75,8 @@ class ApiEnvelopeMiddleware(BaseHTTPMiddleware):
 
 # 注意注册顺序：后注册的在外层，CORS 必须能处理最终响应（含封装后）
 app.add_middleware(ApiEnvelopeMiddleware)
+app.add_middleware(AuthMiddleware)
+app.add_middleware(HttpLogMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origin_list,

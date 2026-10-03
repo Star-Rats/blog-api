@@ -15,4 +15,4 @@ ENV APP_ENV=prod
 EXPOSE 8000
 
 # PORT/WORKERS 可在 docker-compose.yml 中通过环境变量覆盖
-CMD ["/bin/sh", "-c", ".venv/bin/uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS:-2}"]
+CMD ["/bin/sh", "-c", ".venv/bin/uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS:-2} --no-access-log"]
